@@ -2,55 +2,54 @@ import SwiftUI
 
 // MARK: - Ambient background
 
-/// Dimensional background: the warming gradient plus soft mint/gold glow blobs.
-/// Used behind the main screens so cards float on real depth.
+/// Porcelain backdrop with a trace of the crystal's amber light and cool edge.
 struct AmbientBackground: View {
     var progress: Double = 0.3
 
     var body: some View {
         ZStack {
             Theme.heroGradient(progress: progress)
-            Circle().fill(Theme.mint.opacity(0.16)).frame(width: 360, height: 360)
-                .blur(radius: 100).offset(x: -130, y: -300)
-            Circle().fill(Theme.gold.opacity(0.10)).frame(width: 280, height: 280)
-                .blur(radius: 100).offset(x: 150, y: -150)
-            Circle().fill(Theme.mint.opacity(0.07)).frame(width: 320, height: 320)
-                .blur(radius: 110).offset(x: 120, y: 380)
+            Circle().fill(Theme.amberLight.opacity(0.16)).frame(width: 320, height: 320)
+                .blur(radius: 110).offset(x: -125, y: -120)
+            Circle().fill(Theme.icyBlue.opacity(0.26)).frame(width: 290, height: 290)
+                .blur(radius: 110).offset(x: 150, y: -70)
+            Circle().fill(Theme.indigo.opacity(0.035)).frame(width: 340, height: 340)
+                .blur(radius: 130).offset(x: 100, y: 460)
         }
         .ignoresSafeArea()
+        .allowsHitTesting(false)
     }
 }
 
 // MARK: - Surfaces
 
-/// Elevated glassmorphic card: frosted material, green tint, top sheen, a fine
-/// light border, and layered shadows for real depth.
+/// Quiet translucent porcelain surface. Deliberately less ornate than the rock.
 struct GlassCard: View {
-    var cornerRadius: CGFloat = 26
+    var cornerRadius: CGFloat = 24
     var glow: Bool = false
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         shape
             .fill(.ultraThinMaterial)
-            .overlay(shape.fill(Color(hex: 0x0E2A20).opacity(0.34)))
+            .overlay(shape.fill(Theme.paper.opacity(0.72)))
             .overlay(
                 shape.fill(
-                    LinearGradient(colors: [.white.opacity(0.12), .clear],
+                    LinearGradient(colors: [.white.opacity(0.52), .clear],
                                    startPoint: .top, endPoint: .center))
             )
             .overlay(
                 shape.strokeBorder(
-                    LinearGradient(colors: [.white.opacity(0.28), .white.opacity(0.04)],
+                    LinearGradient(colors: [.white.opacity(0.90), Theme.hairline.opacity(0.7)],
                                    startPoint: .top, endPoint: .bottom),
                     lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.38), radius: 16, x: 0, y: 10)
-            .shadow(color: Theme.mint.opacity(glow ? 0.20 : 0.06), radius: 24, x: 0, y: 4)
+            .shadow(color: Theme.indigo.opacity(0.08), radius: 24, x: 0, y: 12)
+            .shadow(color: Theme.amber.opacity(glow ? 0.14 : 0.02), radius: 28, x: 0, y: 3)
     }
 }
 
-/// A hero sub-metric tile (money saved, sessions avoided, …) with a glowing glyph.
+/// A hero sub-metric tile (money saved, sessions avoided, …).
 struct StatTile: View {
     let icon: String
     let value: String
@@ -59,20 +58,20 @@ struct StatTile: View {
     var body: some View {
         VStack(spacing: 8) {
             ZStack {
-                Circle().fill(Theme.mint.opacity(0.18)).frame(width: 36, height: 36).blur(radius: 3)
+                Circle().fill(Theme.amberLight.opacity(0.32)).frame(width: 36, height: 36)
                 Image(systemName: icon)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Theme.mint)
+                    .foregroundStyle(Theme.amber)
             }
             Text(value)
                 .font(Theme.rounded(20, .bold))
-                .foregroundStyle(Theme.cream)
+                .foregroundStyle(Theme.ink)
                 .monospacedDigit()
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
             Text(label)
                 .font(Theme.rounded(11, .medium))
-                .foregroundStyle(Theme.cream.opacity(0.55))
+                .foregroundStyle(Theme.mutedInk)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 18)
@@ -86,8 +85,9 @@ struct StatTile: View {
 struct PillButton: View {
     let title: String
     var icon: String? = nil
+    var trailingIcon: String? = nil
     var filled: Bool = true
-    var tint: Color = Theme.mint
+    var tint: Color = Theme.ink
     let action: () -> Void
 
     var body: some View {
@@ -98,25 +98,22 @@ struct PillButton: View {
             HStack(spacing: 9) {
                 if let icon { Image(systemName: icon).font(.system(size: 16, weight: .bold)) }
                 Text(title).font(Theme.rounded(17, .semibold))
+                if let trailingIcon { Image(systemName: trailingIcon).font(.system(size: 16, weight: .medium)) }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 17)
-            .foregroundStyle(filled ? Color(hex: 0x06241A) : Theme.cream)
+            .padding(.vertical, 18)
+            .foregroundStyle(filled ? (tint == Theme.ink || tint == Theme.indigo ? Theme.paper : Theme.ink) : Theme.ink)
             .background {
                 if filled {
                     Capsule()
-                        .fill(LinearGradient(colors: [Theme.brightMint, tint],
+                        .fill(LinearGradient(colors: [tint.opacity(0.92), tint],
                                              startPoint: .top, endPoint: .bottom))
-                        .overlay(
-                            Capsule().fill(
-                                LinearGradient(colors: [.white.opacity(0.40), .clear],
-                                               startPoint: .top, endPoint: .center))
-                        )
-                        .shadow(color: tint.opacity(0.45), radius: 16, x: 0, y: 8)
+                        .shadow(color: Theme.indigo.opacity(0.15), radius: 12, x: 0, y: 7)
                 } else {
                     Capsule()
                         .fill(.ultraThinMaterial)
-                        .overlay(Capsule().strokeBorder(.white.opacity(0.18), lineWidth: 1))
+                        .overlay(Capsule().fill(Theme.paper.opacity(0.50)))
+                        .overlay(Capsule().strokeBorder(Theme.ink.opacity(0.36), lineWidth: 1))
                 }
             }
         }
@@ -146,17 +143,17 @@ struct Chip: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 11)
-        .foregroundStyle(selected ? Color(hex: 0x06241A) : Theme.cream)
+        .foregroundStyle(Theme.ink)
         .background {
             Capsule().fill(
                 selected
-                ? AnyShapeStyle(LinearGradient(colors: [Theme.brightMint, Theme.mint],
-                                               startPoint: .top, endPoint: .bottom))
-                : AnyShapeStyle(.ultraThinMaterial)
+                ? AnyShapeStyle(Theme.icyBlue)
+                : AnyShapeStyle(Theme.paper.opacity(0.64))
             )
         }
-        .overlay(Capsule().strokeBorder(.white.opacity(selected ? 0 : 0.12), lineWidth: 1))
-        .shadow(color: selected ? Theme.mint.opacity(0.35) : .clear, radius: 10, x: 0, y: 4)
+        .overlay(Capsule().strokeBorder(Theme.ink.opacity(selected ? 0.42 : 0.12), lineWidth: 1))
+        .shadow(color: selected ? Theme.indigo.opacity(0.10) : .clear, radius: 8, x: 0, y: 3)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
@@ -164,7 +161,7 @@ struct Chip: View {
 
 extension View {
     /// Soft elevation shadow for floating surfaces (tab bar, sheets).
-    func softShadow(_ color: Color = .black.opacity(0.35),
+    func softShadow(_ color: Color = Theme.indigo.opacity(0.11),
                     radius: CGFloat = 18, y: CGFloat = 10) -> some View {
         shadow(color: color, radius: radius, x: 0, y: y)
     }
@@ -221,7 +218,7 @@ struct ConfettiView: View {
     private let pieces: [Piece]
 
     init(count: Int = 90) {
-        let colors: [Color] = [Theme.mint, Theme.brightMint, Theme.gold, Theme.cream, Color(hex: 0x9AE6B4)]
+        let colors: [Color] = [Theme.amber, Theme.amberLight, Theme.icyBlue, Theme.indigo, Theme.paper]
         pieces = (0..<count).map { _ in
             Piece(x: .random(in: 0...1),
                   delay: .random(in: 0...0.7),

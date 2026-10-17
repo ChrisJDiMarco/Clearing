@@ -12,6 +12,7 @@ enum WidgetSync {
         var cleanStart: Date
         var weeklySpend: Double
         var sessionsPerDay: Double
+        var riskWindow: String? = nil
     }
 
     static func write(_ snap: Snapshot) {

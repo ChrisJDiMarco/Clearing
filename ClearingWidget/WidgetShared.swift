@@ -10,6 +10,7 @@ enum WidgetShared {
         var cleanStart: Date
         var weeklySpend: Double
         var sessionsPerDay: Double
+        var riskWindow: String? = nil
     }
 
     static func read() -> Snapshot? {
@@ -21,6 +22,6 @@ enum WidgetShared {
 
     /// Shown in previews / gallery / before the App Group is wired up.
     static var sample: Snapshot {
-        Snapshot(cleanStart: Date().addingTimeInterval(-12 * 86_400), weeklySpend: 60, sessionsPerDay: 4)
+        Snapshot(cleanStart: Date().addingTimeInterval(-12 * 86_400), weeklySpend: 60, sessionsPerDay: 4, riskWindow: "Evening")
     }
 }

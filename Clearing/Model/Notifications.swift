@@ -1,10 +1,13 @@
 import Foundation
 import UserNotifications
 
-/// Local notifications: a daily check-in nudge + one notification per upcoming
-/// recovery milestone (scheduled from the clean-start date). 100% local, no server.
+/// Local notifications. Lock-screen copy stays neutral because quitting can be
+/// private even when the user opts in to reminders.
 enum Reminders {
     private static let center = UNUserNotificationCenter.current()
+    private static var requestIDs: [String] {
+        ["clearing.daily", "clearing.urge.followup"] + Milestones.all.map { "clearing.milestone.\($0.day)" }
+    }
 
     @discardableResult
     static func requestAuthorization() async -> Bool {
@@ -12,15 +15,15 @@ enum Reminders {
     }
 
     static func schedule(cleanStart: Date, dailyHour: Int = 9) {
-        center.removeAllPendingNotificationRequests()
+        center.removePendingNotificationRequests(withIdentifiers: requestIDs)
 
         // Daily check-in reminder
         var daily = DateComponents()
         daily.hour = dailyHour
         daily.minute = 0
         let dailyContent = UNMutableNotificationContent()
-        dailyContent.title = "Stay clear today"
-        dailyContent.body = "One tap keeps your streak alive. You've got this."
+        dailyContent.title = "A moment for yourself"
+        dailyContent.body = "Open Clearing when you're ready."
         dailyContent.sound = .default
         center.add(UNNotificationRequest(
             identifier: "clearing.daily",
@@ -33,8 +36,8 @@ enum Reminders {
             let fireDate = cleanStart.addingTimeInterval(milestone.day * 86_400)
             guard fireDate > now.addingTimeInterval(60) else { continue }
             let content = UNMutableNotificationContent()
-            content.title = "\(milestone.badge) 🍃"
-            content.body = milestone.fact
+            content.title = "A moment worth noticing"
+            content.body = "Take a moment to reflect on your progress."
             content.sound = .default
             center.add(UNNotificationRequest(
                 identifier: "clearing.milestone.\(milestone.day)",
@@ -45,6 +48,19 @@ enum Reminders {
     }
 
     static func cancelAll() {
-        center.removeAllPendingNotificationRequests()
+        center.removePendingNotificationRequests(withIdentifiers: requestIDs)
+    }
+
+    static func scheduleUrgeFollowUp(action: String) {
+        center.removePendingNotificationRequests(withIdentifiers: ["clearing.urge.followup"])
+
+        let content = UNMutableNotificationContent()
+        content.title = "A gentle check-in"
+        content.body = "How are you doing now?"
+        content.sound = .default
+        center.add(UNNotificationRequest(
+            identifier: "clearing.urge.followup",
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 5 * 60, repeats: false)))
     }
 }

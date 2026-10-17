@@ -10,7 +10,7 @@ struct ClearingApp: App {
             RootView()
                 .environment(model)
                 .environment(store)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(.light)
                 .tint(Theme.mint)
         }
     }

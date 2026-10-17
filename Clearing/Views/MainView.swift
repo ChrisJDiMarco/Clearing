@@ -1,52 +1,61 @@
 import SwiftUI
 
-/// Holds the tab content, the floating tab bar, and a single full-screen cover
-/// (paywall OR milestone celebration — never both at once).
+/// Holds the tab content, the floating tab bar, and one full-screen support
+/// or milestone experience at a time.
 struct MainView: View {
     @Environment(AppModel.self) private var model
-    @Environment(Store.self) private var store
 
     @State private var tab: Tab = .home
-    @State private var showUrge = false
     @State private var showSettings = false
     @State private var cover: ActiveCover?
 
     enum Tab { case home, progress }
 
-    /// One cover state avoids stacking two `.fullScreenCover` modifiers (undefined order).
+    /// One cover state avoids stacking multiple `.fullScreenCover` modifiers.
     enum ActiveCover: Identifiable {
-        case paywall
+        case urge
+        case exitPlan
         case celebration(Milestone)
         var id: String {
             switch self {
-            case .paywall: "paywall"
+            case .urge: "urge"
+            case .exitPlan: "exitPlan"
             case .celebration(let m): "m\(m.day)"
             }
         }
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Group {
-                switch tab {
-                case .home:     HomeView(showSettings: $showSettings, onDebugCelebrate: presentPendingCelebration)
-                case .progress: RecoveryTimelineView()
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ZStack {
+            AmbientBackground(progress: model.dawnProgress())
 
-            tabBar
+            VStack(spacing: 0) {
+                Group {
+                    switch tab {
+                    case .home:     HomeView(showSettings: $showSettings,
+                                             onDebugCelebrate: presentPendingCelebration,
+                                             onSupport: { cover = .urge },
+                                             onUsePlan: { cover = .exitPlan })
+                    case .progress: RecoveryTimelineView()
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                .overlay(alignment: .bottom) { tabBoundaryFade }
+
+                tabBar
+            }
         }
-        .sheet(isPresented: $showUrge) {
-            UrgeView().presentationDetents([.large])
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
         .fullScreenCover(item: $cover) { which in
             switch which {
-            case .paywall:
-                PaywallView()
+            case .urge:
+                UrgeView()
+            case .exitPlan:
+                UrgeView(startWithPlan: true)
             case .celebration(let milestone):
                 MilestoneCelebrationView(milestone: milestone) {
                     model.markCelebrated(milestone)
@@ -58,15 +67,13 @@ struct MainView: View {
             #if DEBUG
             switch Demo.screen {
             case "progress": tab = .progress
-            case "urge":      showUrge = true
+            case "urge":      cover = .urge
             case "milestone": if let m = model.reachedMilestones().last { cover = .celebration(m) }
-            case "paywall":   presentPaywall()
             case "settings":  showSettings = true
             default: break
             }
             #endif
             checkCelebration()
-            maybePresentPaywall()
             if model.data.remindersEnabled {
                 Task {
                     let granted = await Reminders.requestAuthorization()
@@ -75,6 +82,13 @@ struct MainView: View {
                 }
             }
         }
+    }
+
+    private var tabBoundaryFade: some View {
+        LinearGradient(colors: [.clear, Theme.canvas.opacity(0.96)],
+                       startPoint: .top, endPoint: .bottom)
+            .frame(height: 36)
+            .allowsHitTesting(false)
     }
 
     private func checkCelebration() {
@@ -89,37 +103,20 @@ struct MainView: View {
         }
     }
 
-    /// Hard onboarding paywall: shown once after onboarding, if not already premium.
-    private func maybePresentPaywall() {
-        guard cover == nil else { return }
-        if !store.isPremium && !model.data.hasSeenPaywall {
-            presentPaywall()
-        }
-    }
-
-    private func presentPaywall() {
-        model.data.hasSeenPaywall = true   // mark at present-time, not on dismiss (avoids re-show race)
-        cover = .paywall
-    }
-
     private var tabBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 0) {
             tabItem(.home, icon: "house.fill", label: "Today")
+            tabItem(.progress, icon: "chart.bar.fill", label: "Progress")
             urgeButton
-            tabItem(.progress, icon: "chart.line.uptrend.xyaxis", label: "Progress")
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 10)
-        .background(
-            Capsule()
-                .fill(.ultraThinMaterial)
-                .overlay(Capsule().strokeBorder(
-                    LinearGradient(colors: [.white.opacity(0.22), .white.opacity(0.04)],
-                                   startPoint: .top, endPoint: .bottom), lineWidth: 1))
-                .softShadow(.black.opacity(0.4), radius: 20, y: 12)
-        )
-        .padding(.horizontal, 40)
-        .padding(.bottom, 6)
+        .padding(.horizontal, 26)
+        .padding(.top, 9)
+        .padding(.bottom, 4)
+        .background {
+            Theme.paper
+                .ignoresSafeArea(edges: .bottom)
+                .overlay(alignment: .top) { Theme.hairline.frame(height: 1) }
+        }
     }
 
     private func tabItem(_ which: Tab, icon: String, label: String) -> some View {
@@ -127,13 +124,13 @@ struct MainView: View {
             Haptics.soft()
             withAnimation(.snappy) { tab = which }
         } label: {
-            VStack(spacing: 3) {
-                Image(systemName: icon).font(.system(size: 18, weight: .semibold))
-                Text(label).font(Theme.rounded(10, .semibold))
+            VStack(spacing: 5) {
+                Image(systemName: icon).font(.system(size: 20, weight: .medium))
+                Text(label).font(.system(size: 11, weight: .medium))
             }
-            .foregroundStyle(tab == which ? Theme.mint : Theme.cream.opacity(0.4))
+            .foregroundStyle(tab == which ? Theme.ink : Theme.mutedInk)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            .frame(height: 54)
         }
         .buttonStyle(.plain)
     }
@@ -141,20 +138,15 @@ struct MainView: View {
     private var urgeButton: some View {
         Button {
             Haptics.rigid()
-            showUrge = true
+            cover = .urge
         } label: {
-            VStack(spacing: 3) {
-                Image(systemName: "wind").font(.system(size: 20, weight: .bold))
-                Text("Urge").font(Theme.rounded(10, .bold))
+            VStack(spacing: 5) {
+                Image(systemName: "lifepreserver").font(.system(size: 20, weight: .medium))
+                Text("Support").font(.system(size: 11, weight: .medium))
             }
-            .foregroundStyle(Color(hex: 0x06241A))
+            .foregroundStyle(Theme.mutedInk)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(
-                Capsule().fill(
-                    LinearGradient(colors: [Theme.brightMint, Theme.mint],
-                                   startPoint: .top, endPoint: .bottom))
-            )
+            .frame(height: 54)
         }
         .buttonStyle(PressableStyle())
     }

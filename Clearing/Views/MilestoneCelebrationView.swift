@@ -12,24 +12,22 @@ struct MilestoneCelebrationView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(hex: 0x123A2C), Color(hex: 0x07150F)],
-                           startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
+            AmbientBackground(progress: 0.8)
 
-            ConfettiView()
+            ConfettiView(count: 48)
                 .ignoresSafeArea()
 
             VStack(spacing: 28) {
                 Spacer()
 
                 Text("Milestone reached")
-                    .font(Theme.rounded(15, .semibold))
-                    .foregroundStyle(Theme.gold)
+                    .font(Theme.rounded(12, .semibold))
+                    .foregroundStyle(Theme.amberInk)
                     .textCase(.uppercase)
                     .tracking(3)
                     .opacity(appeared ? 1 : 0)
 
-                BadgeCard(milestone: milestone, days: model.daysClean())
+                BadgeCard(milestone: milestone)
                     .scaleEffect(appeared ? 1 : 0.7)
                     .opacity(appeared ? 1 : 0)
 
@@ -45,19 +43,22 @@ struct MilestoneCelebrationView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 17)
-                            .foregroundStyle(Color(hex: 0x06241A))
+                            .foregroundStyle(Theme.paper)
                             .background(Capsule().fill(
-                                LinearGradient(colors: [Theme.brightMint, Theme.mint],
+                                LinearGradient(colors: [Theme.ink, Theme.indigo],
                                                startPoint: .leading, endPoint: .trailing)))
                         }
                         .buttonStyle(PressableStyle())
+                        .simultaneousGesture(TapGesture().onEnded {
+                            AppEvents.log("badge_share_tap", milestone.badge)
+                        })
                     }
                     Button("Keep going") {
                         Haptics.soft()
                         onDismiss()
                     }
                     .font(Theme.rounded(16, .semibold))
-                    .foregroundStyle(Theme.cream.opacity(0.6))
+                    .foregroundStyle(Theme.mutedInk)
                 }
                 .padding(.horizontal, 36)
                 .padding(.bottom, 24)
@@ -74,8 +75,8 @@ struct MilestoneCelebrationView: View {
         // Defer off the current run-loop turn so the entry animation starts first
         // (ImageRenderer.uiImage blocks the main thread while it rasterizes).
         Task { @MainActor in
-            let card = BadgeCard(milestone: milestone, days: model.daysClean())
-                .frame(width: 320, height: 400)
+            let card = BadgeCard(milestone: milestone)
+                .frame(width: 320, height: 520)
             let renderer = ImageRenderer(content: card)
             renderer.scale = 3
             if let ui = renderer.uiImage {
@@ -88,52 +89,74 @@ struct MilestoneCelebrationView: View {
 /// The shareable badge. Used on screen and rendered to an image for sharing.
 struct BadgeCard: View {
     let milestone: Milestone
-    let days: Int
+
+    private var amount: Int { milestone.day < 1 ? Int(milestone.day * 24) : Int(milestone.day) }
+    private var unit: String {
+        if milestone.day < 1 { return "HOURS CLEAR" }
+        return amount == 1 ? "DAY CLEAR" : "DAYS CLEAR"
+    }
 
     var body: some View {
         VStack(spacing: 18) {
-            ZStack {
-                Circle()
-                    .fill(LinearGradient(colors: [Theme.gold.opacity(0.3), .clear],
-                                         startPoint: .top, endPoint: .bottom))
-                    .frame(width: 130, height: 130)
-                Circle()
-                    .stroke(Theme.gold, lineWidth: 2)
-                    .frame(width: 104, height: 104)
+            HStack(spacing: 7) {
+                Image(systemName: "diamond.fill")
+                Text("CLEARING")
+                    .tracking(1.8)
+                Spacer()
                 Image(systemName: milestone.icon)
-                    .font(.system(size: 44, weight: .medium))
-                    .foregroundStyle(LinearGradient(colors: [Theme.gold, Theme.brightMint],
-                                                    startPoint: .top, endPoint: .bottom))
+            }
+            .font(Theme.rounded(12, .bold))
+            .foregroundStyle(Theme.amberInk)
+
+            Spacer(minLength: 4)
+
+            VStack(spacing: 4) {
+                Text("\(amount)")
+                    .font(.system(size: 104, weight: .semibold, design: .serif))
+                    .fontWidth(.condensed)
+                    .foregroundStyle(Theme.ink)
+                    .monospacedDigit()
+                Text(unit)
+                    .font(Theme.rounded(14, .bold))
+                    .tracking(3)
+                    .foregroundStyle(Theme.mutedInk)
             }
 
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 Text(milestone.badge)
-                    .font(Theme.rounded(26, .bold))
-                    .foregroundStyle(Theme.cream)
+                    .font(Theme.display(29))
+                    .foregroundStyle(Theme.ink)
                     .multilineTextAlignment(.center)
                 Text(milestone.fact)
                     .font(Theme.rounded(14))
-                    .foregroundStyle(Theme.cream.opacity(0.65))
+                    .foregroundStyle(Theme.mutedInk)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 22)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            HStack(spacing: 6) {
-                Image(systemName: "leaf.fill").font(.system(size: 12))
-                Text("\(days) days clear · Clearing")
-                    .font(Theme.rounded(12, .semibold))
-            }
-            .foregroundStyle(Theme.mint)
-            .padding(.top, 2)
+            Spacer(minLength: 4)
+
+            Text("one moment at a time")
+                .font(Theme.rounded(12, .semibold))
+                .foregroundStyle(Theme.amberInk)
         }
-        .padding(.vertical, 34)
-        .padding(.horizontal, 20)
+        .padding(24)
         .frame(maxWidth: .infinity)
+        .frame(minHeight: 420)
         .background(
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Color(hex: 0x0C2219))
+                .fill(LinearGradient(colors: [Theme.paper, Theme.canvas],
+                                     startPoint: .top, endPoint: .bottom))
+                .overlay(alignment: .topTrailing) {
+                    Circle()
+                        .fill(Theme.icyBlue.opacity(0.75))
+                        .frame(width: 180, height: 180)
+                        .blur(radius: 36)
+                        .offset(x: 76, y: -78)
+                }
                 .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .stroke(Theme.gold.opacity(0.35), lineWidth: 1))
+                    .stroke(Theme.hairline, lineWidth: 1))
+                .shadow(color: Theme.indigo.opacity(0.13), radius: 22, x: 0, y: 14)
         )
         .padding(.horizontal, 28)
     }

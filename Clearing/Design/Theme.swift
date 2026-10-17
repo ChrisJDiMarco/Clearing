@@ -1,32 +1,49 @@
 import SwiftUI
 
-/// Visual system for Clearing. The whole product wedge is craft, so the palette
-/// and motion live in one place and stay consistent everywhere.
+/// The crystal is the ornament. The interface around it stays quiet, warm and legible.
 enum Theme {
-    static let cream      = Color(hex: 0xF4F1E8)
-    static let mint       = Color(hex: 0x86E5B0)
-    static let brightMint = Color(hex: 0xB8F2C9)
-    static let gold       = Color(hex: 0xF0C674)
-    static let deepGreen  = Color(hex: 0x0C211B)
-    static let forest     = Color(hex: 0x12352A)
-    static let danger     = Color(hex: 0xE89A78)   // warm, never harsh — tone matters
+    // Semantic colors for new screens. Legacy aliases below keep existing views
+    // consistent while their layouts are refreshed.
+    static let paper      = Color(hex: 0xFFFEFC)
+    static let canvas     = Color(hex: 0xF7F5F0)
+    static let ink        = Color(hex: 0x19232A)
+    static let mutedInk   = Color(hex: 0x626C74)
+    static let amber      = Color(hex: 0xC78643)
+    static let amberInk   = Color(hex: 0x86552B)
+    static let amberLight = Color(hex: 0xEFD2AD)
+    static let indigo     = Color(hex: 0x141E2D)
+    static let icyBlue    = Color(hex: 0xDCECF4)
+    static let hairline   = Color(hex: 0xD9DADC)
+    static let danger     = Color(hex: 0xA55C4A) // calm but clear on light surfaces
+
+    static let cream      = ink
+    static let mint       = amberInk
+    static let brightMint = amberLight
+    static let gold       = amber
+    static let deepGreen  = ink
+    static let forest     = indigo
 
     static func rounded(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
         .system(size: size, weight: weight, design: .rounded)
     }
 
-    /// Hero background. Warms from cool forest night toward dawn as the streak grows.
+    static func display(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+        .system(size: size, weight: weight, design: .serif)
+    }
+
+    /// A still, warm backdrop. Progress gently lifts the light without changing
+    /// the identity of the screen or putting motion behind readable text.
     static func heroGradient(progress p: Double) -> LinearGradient {
         let t = min(max(p, 0), 1)
         let top = Color(
             .sRGB,
-            red:   0.05 + 0.32 * t,
-            green: 0.14 + 0.16 * t,
-            blue:  0.11 + 0.02 * t,
+            red:   0.969 + 0.024 * t,
+            green: 0.961 + 0.027 * t,
+            blue:  0.941 + 0.047 * t,
             opacity: 1
         )
         return LinearGradient(
-            colors: [top, Color(hex: 0x0C211B), Color(hex: 0x050F0A)],
+            colors: [top, paper, canvas],
             startPoint: .top,
             endPoint: .bottom
         )
@@ -35,7 +52,7 @@ enum Theme {
     /// Soft radial glow placed behind the hero number.
     static func glow(progress p: Double) -> RadialGradient {
         let t = min(max(p, 0), 1)
-        let core = mint.opacity(0.18 + 0.22 * t)
+        let core = amberLight.opacity(0.14 + 0.14 * t)
         return RadialGradient(
             colors: [core, .clear],
             center: .center,

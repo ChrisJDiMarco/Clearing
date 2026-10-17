@@ -5,7 +5,6 @@ struct SettingsView: View {
     @Environment(Store.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var showResetConfirm = false
-    @State private var showPaywall = false
 
     var body: some View {
         NavigationStack {
@@ -14,11 +13,16 @@ struct SettingsView: View {
 
                 ScrollView {
                     VStack(spacing: 16) {
-                        whyCard
+                        calibrationCard
                         statsCard
                         remindersCard
-                        upgradeCard
                         disclaimerCard
+                        Button("Restore previous purchase") {
+                            Task { await store.restore() }
+                        }
+                        .font(Theme.rounded(13, .medium))
+                        .foregroundStyle(Theme.mutedInk)
+                        .disabled(store.isPurchasing)
                         resetButton
                         footer
                     }
@@ -30,7 +34,7 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }.foregroundStyle(Theme.mint)
+                    Button("Done") { dismiss() }.foregroundStyle(Theme.ink)
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
@@ -44,43 +48,93 @@ struct SettingsView: View {
         } message: {
             Text("This clears your streak, milestones, and saved totals. It can't be undone.")
         }
-        .sheet(isPresented: $showPaywall) {
-            PaywallView()
-        }
     }
 
-    private var whyCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Why you're quitting", systemImage: "target")
+    private var statsCard: some View {
+        VStack(spacing: 0) {
+            settingRow("Current stretch since", value: model.cleanStart.formatted(date: .abbreviated, time: .omitted))
+            Divider().overlay(Theme.hairline)
+            settingRow("Weekly cost", value: model.data.weeklySpend.asMoney)
+            Divider().overlay(Theme.hairline)
+            settingRow("Hard moments handled", value: "\(model.urgesBeaten)")
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 6)
+        .background(GlassCard())
+    }
+
+    private var calibrationCard: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Label("Plan calibration", systemImage: "slider.horizontal.3")
                 .font(Theme.rounded(16, .bold))
                 .foregroundStyle(Theme.cream)
-            if model.data.reasons.isEmpty {
-                Text("No reasons set yet.")
-                    .font(Theme.rounded(14))
-                    .foregroundStyle(Theme.cream.opacity(0.5))
-            } else {
+
+            VStack(alignment: .leading, spacing: 10) {
+                settingLabel("Risk window")
                 FlowLayout(spacing: 8) {
-                    ForEach(model.data.reasons, id: \.self) { reason in
-                        Chip(title: reason, selected: true)
+                    ForEach(RiskWindow.allCases) { window in
+                        Button {
+                            Haptics.soft()
+                            model.data.riskWindow = window.rawValue
+                            model.refreshReminders()
+                        } label: {
+                            Chip(title: window.shortLabel, icon: window.icon,
+                                 selected: model.selectedRiskWindow() == window)
+                        }
+                        .buttonStyle(PressableStyle())
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    settingLabel("Weekly cost")
+                    Spacer()
+                    Text(model.data.weeklySpend.asMoney)
+                        .font(Theme.rounded(14, .bold))
+                        .foregroundStyle(Theme.amberInk)
+                }
+                Slider(value: Binding(get: {
+                    model.data.weeklySpend
+                }, set: { value in
+                    model.data.weeklySpend = value
+                }), in: 0...300, step: 5)
+                .tint(Theme.mint)
+            }
+
+            Stepper(value: Binding(get: {
+                model.data.sessionsPerDay
+            }, set: { value in
+                model.data.sessionsPerDay = value
+            }), in: 0...20, step: 0.5) {
+                HStack {
+                    settingLabel("Daily sessions")
+                    Spacer()
+                    Text(String(format: "%.1f", model.data.sessionsPerDay))
+                        .font(Theme.rounded(14, .bold))
+                        .foregroundStyle(Theme.cream)
+                }
+            }
+            .tint(Theme.mint)
+
+            VStack(alignment: .leading, spacing: 10) {
+                settingLabel("Reasons")
+                FlowLayout(spacing: 8) {
+                    ForEach(Reason.allCases) { reason in
+                        let selected = model.data.reasons.contains(reason.rawValue)
+                        Button {
+                            Haptics.soft()
+                            toggleReason(reason)
+                        } label: {
+                            Chip(title: reason.rawValue, icon: reason.icon, selected: selected)
+                        }
+                        .buttonStyle(PressableStyle())
                     }
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
-        .background(GlassCard())
-    }
-
-    private var statsCard: some View {
-        VStack(spacing: 0) {
-            settingRow("Clear since", value: model.cleanStart.formatted(date: .abbreviated, time: .omitted))
-            Divider().overlay(.white.opacity(0.08))
-            settingRow("Weekly cost", value: model.data.weeklySpend.asMoney)
-            Divider().overlay(.white.opacity(0.08))
-            settingRow("Urges beaten", value: "\(model.urgesBeaten)")
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 6)
         .background(GlassCard())
     }
 
@@ -93,9 +147,9 @@ struct SettingsView: View {
                 Text("Reminders")
                     .font(Theme.rounded(16, .bold))
                     .foregroundStyle(Theme.cream)
-                Text("Daily check-in + milestone alerts")
+                Text("Optional prompts with discreet Lock Screen wording")
                     .font(Theme.rounded(13))
-                    .foregroundStyle(Theme.cream.opacity(0.55))
+                    .foregroundStyle(Theme.mutedInk)
             }
             Spacer(minLength: 0)
             Toggle("", isOn: remindersBinding)
@@ -123,72 +177,14 @@ struct SettingsView: View {
             })
     }
 
-    @ViewBuilder private var upgradeCard: some View {
-        if store.isPremium {
-            HStack(spacing: 12) {
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 24))
-                    .foregroundStyle(Theme.gold)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Clearing Plus is active")
-                        .font(Theme.rounded(16, .bold))
-                        .foregroundStyle(Theme.cream)
-                    Text("Thanks for going all in.")
-                        .font(Theme.rounded(13))
-                        .foregroundStyle(Theme.cream.opacity(0.6))
-                }
-                Spacer(minLength: 0)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(18)
-            .background(goldCardBackground)
-        } else {
-            Button {
-                Haptics.soft()
-                showPaywall = true
-            } label: {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Label("Clearing Plus", systemImage: "sparkles")
-                            .font(Theme.rounded(16, .bold))
-                            .foregroundStyle(Theme.gold)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(Theme.gold.opacity(0.7))
-                    }
-                    Text("Lock Screen & StandBy widgets, custom milestone reminders, and the full recovery library.")
-                        .font(Theme.rounded(13))
-                        .foregroundStyle(Theme.cream.opacity(0.6))
-                        .multilineTextAlignment(.leading)
-                    Text("Try free, then \(29.99.asMoney)/yr")
-                        .font(Theme.rounded(14, .semibold))
-                        .foregroundStyle(Theme.cream)
-                        .padding(.top, 2)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(18)
-                .background(goldCardBackground)
-            }
-            .buttonStyle(PressableStyle())
-        }
-    }
-
-    private var goldCardBackground: some View {
-        RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .fill(Theme.gold.opacity(0.08))
-            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Theme.gold.opacity(0.25), lineWidth: 1))
-    }
-
     private var disclaimerCard: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "heart.text.square.fill")
                 .font(.system(size: 18))
                 .foregroundStyle(Theme.mint)
-            Text("Clearing is a personal tracker and support tool — not medical advice. Recovery facts are general information. If you're struggling, please reach out to a doctor or a support line.")
+            Text("Clearing is a personal support tool, not medical care. Your experience may differ from anyone else's. If quitting, sleep, or mood feels unmanageable, a clinician or support service can help.")
                 .font(Theme.rounded(12))
-                .foregroundStyle(Theme.cream.opacity(0.55))
+                .foregroundStyle(Theme.mutedInk)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
@@ -220,12 +216,27 @@ struct SettingsView: View {
         HStack {
             Text(title)
                 .font(Theme.rounded(15, .medium))
-                .foregroundStyle(Theme.cream.opacity(0.7))
+                .foregroundStyle(Theme.mutedInk)
             Spacer()
             Text(value)
                 .font(Theme.rounded(15, .semibold))
                 .foregroundStyle(Theme.cream)
         }
         .padding(.vertical, 13)
+    }
+
+    private func settingLabel(_ title: String) -> some View {
+        Text(title)
+            .font(Theme.rounded(12, .bold))
+            .textCase(.uppercase)
+            .foregroundStyle(Theme.mutedInk)
+    }
+
+    private func toggleReason(_ reason: Reason) {
+        if model.data.reasons.contains(reason.rawValue) {
+            model.data.reasons.removeAll { $0 == reason.rawValue }
+        } else {
+            model.data.reasons.append(reason.rawValue)
+        }
     }
 }

@@ -20,3 +20,6 @@ xcshareddata/xcdebugger/
 
 # macOS
 .DS_Store
+
+# Local DreamLoop visual QA context
+.dream-loop/
